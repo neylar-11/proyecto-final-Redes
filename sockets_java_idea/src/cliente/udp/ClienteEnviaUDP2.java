@@ -61,7 +61,7 @@ public class ClienteEnviaUDP2 extends Thread {
         }
     }
 
-    private Mensaje enviaMensaje(BufferedReader teclado) throws Exception {
+    /*private Mensaje enviaMensaje(BufferedReader teclado) throws Exception {
         Mensaje mensajeObj =new Mensaje();
 
         // leer mensaje teclado
@@ -84,6 +84,38 @@ public class ClienteEnviaUDP2 extends Thread {
         EntradaSalida.mostrarMensaje("Mensaje \""+ mensajeObj.getMensaje()
                 + "\" enviado a servidor " + mensajeObj.getAddressServidor()
                 + ":" + mensajeObj.getPuertoServidor() + "\n");
+        return mensajeObj;
+    }*/
+    private Mensaje enviaMensaje(BufferedReader teclado) throws Exception {
+        Mensaje mensajeObj = new Mensaje();
+
+        // 1. Leer el mensaje del teclado
+        String mensajeOriginal = teclado.readLine();
+
+        // 2. Calcular el CRC32 del mensaje original
+        byte[] bytesOriginales = mensajeOriginal.getBytes(StandardCharsets.UTF_8);
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        crc.update(bytesOriginales);
+        long valorCRC = crc.getValue(); // Este es nuestro Crc
+
+        // 3. Crear el paquete definitivo con nuestro protocolo: "Texto|crc"
+        String paqueteCompleto = mensajeOriginal + "|" + valorCRC;
+        byte[] bufferEnvio = paqueteCompleto.getBytes(StandardCharsets.UTF_8);
+
+        // 4. Crear y enviar el paquete UDP
+        DatagramPacket paquete = new DatagramPacket(bufferEnvio, bufferEnvio.length, addressServer, PUERTO_SERVER);
+        socket.send(paquete);
+
+        // 5. Llenar el objeto mensaje local para el log de la consola
+        mensajeObj.setMensaje(mensajeOriginal);
+        mensajeObj.setcodigoCRC(valorCRC);
+        mensajeObj.setAddressServidor(paquete.getAddress());
+        mensajeObj.setPuertoServidor(paquete.getPort());
+
+        EntradaSalida.mostrarMensaje("Mensaje \"" + mensajeObj.getMensaje() 
+            + "\" [CRC: " + mensajeObj.getcodigoCRC() + "] enviado a servidor " 
+            + mensajeObj.getAddressServidor() + ":" + mensajeObj.getPuertoServidor() + "\n");
+            
         return mensajeObj;
     }
 

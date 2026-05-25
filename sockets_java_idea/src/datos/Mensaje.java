@@ -8,6 +8,7 @@ public class Mensaje {
     protected int puertoCliente;
     protected InetAddress addressCliente;
     protected InetAddress addressServidor;
+    protected long codigoCRC; // nuevo atributo para el CRC
 
     public Mensaje() {
 
@@ -19,6 +20,7 @@ public class Mensaje {
         this.puertoCliente = puertoCliente;
         this.addressCliente = addressCliente;
         this.addressServidor = addressServidor;
+        this.codigoCRC = codigoCRC; // <--- NUEVO: calcular el CRC al crear el mensaje
     }
 
     public String getMensaje() {
@@ -59,5 +61,14 @@ public class Mensaje {
 
     public void setAddressServidor(InetAddress addressServidor) {
         this.addressServidor = addressServidor;
+    }
+
+    // NUEVOS: Getters y Setters para el CRC
+    public long getcodigoCRC() {
+        return codigoCRC;
+    }
+
+    public void setcodigoCRC(long codigoCRC) {
+        this.codigoCRC = codigoCRC;
     }
 }

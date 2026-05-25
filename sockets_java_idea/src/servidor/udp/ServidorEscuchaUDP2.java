@@ -79,7 +79,7 @@ public class ServidorEscuchaUDP2 extends Thread {
         enviaMensaje(mensajeObj);
     }
 
-    private Mensaje recibeMensaje() throws Exception {
+    /*private Mensaje recibeMensaje() throws Exception {
 
         Mensaje mensajeObj = new Mensaje();
         // buffer recepción
@@ -101,6 +101,57 @@ public class ServidorEscuchaUDP2 extends Thread {
 
         EntradaSalida.mostrarMensaje("Mensaje recibido \"" + mensajeObj.getMensaje() + "\" del cliente "
                 + mensajeObj.getAddressCliente() + ":" + mensajeObj.getPuertoCliente()+ "\n");
+
+        return mensajeObj;
+    }*/
+
+    private Mensaje recibeMensaje() throws Exception {
+        Mensaje mensajeObj = new Mensaje();
+        byte[] buffer = new byte[MAX_BUFFER];
+        DatagramPacket paquete = new DatagramPacket(buffer, buffer.length);
+
+        // 1. El servidor se bloquea esperando el paquete
+        socket.receive(paquete);
+
+        // 2. Convertir los bytes recibidos a String completo ("Texto|Checksum")
+        String cadenaRecibida = new String(paquete.getData(), 0, paquete.getLength(), StandardCharsets.UTF_8);
+
+        // 3. Separar los datos usando el token '|'
+        // Se usa "\\|" porque el carácter '|' es especial en expresiones regulares
+        String[] partes = cadenaRecibida.split("\\|");
+
+        if (partes.length == 2) {
+            String mensajeTexto = partes[0];
+            long checksumRecibido = Long.parseLong(partes[1]);
+
+            // 4. Recalcular el CRC32 sobre el texto recibido para verificar integridad
+            byte[] bytesParaVerificar = mensajeTexto.getBytes(StandardCharsets.UTF_8);
+            java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+            crc.update(bytesParaVerificar);
+            long checksumCalculado = crc.getValue();
+
+            // 5. Validar si los códigos coinciden (Fase de detección de errores)
+            if (checksumCalculado == checksumRecibido) {
+                mensajeObj.setMensaje(mensajeTexto);
+                EntradaSalida.mostrarMensaje("[INTEGRIDAD OK] ");
+            } else {
+                // Si los números no coinciden, el mensaje se alteró en la red
+                mensajeObj.setMensaje("[ERROR: MENSAJE CORRUPTO] -> " + mensajeTexto);
+                EntradaSalida.mostrarMensaje("[¡ALERTA DE ERROR EN RED!] ");
+            }
+        
+            mensajeObj.setcodigoCRC(checksumRecibido);
+        } else {
+            // Por si se recibe un paquete que no cumpla con el formato
+            mensajeObj.setMensaje(cadenaRecibida);
+        }
+
+        // 6. Asignar los datos del remitente (Cliente)
+        mensajeObj.setAddressCliente(paquete.getAddress());
+        mensajeObj.setPuertoCliente(paquete.getPort());
+
+        EntradaSalida.mostrarMensaje("Mensaje recibido \"" + mensajeObj.getMensaje() 
+            + "\" del cliente " + mensajeObj.getAddressCliente() + ":" + mensajeObj.getPuertoCliente() + "\n");
 
         return mensajeObj;
     }
