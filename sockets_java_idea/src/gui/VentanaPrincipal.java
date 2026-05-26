@@ -166,7 +166,7 @@ public class VentanaPrincipal extends JFrame {
 
             // Creamos un Thread secundario para que la ventana no se congele durante el envío pesado
             new Thread(() -> {
-                try (Socket socketTCP = new Socket(ipTarget, 60000);
+                try (Socket socketTCP = new Socket(ipTarget, 50000);
                      DataOutputStream out = new DataOutputStream(socketTCP.getOutputStream());
                      FileInputStream fis = new FileInputStream(archivo)) {
 

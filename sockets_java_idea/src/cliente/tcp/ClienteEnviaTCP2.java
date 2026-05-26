@@ -52,11 +52,10 @@ public class ClienteEnviaTCP2 extends Thread {
                     break;
                 }
             }
-            ========================================================== */
+            */
 
-            // ==========================================================
-            // NUEVO CÓDIGO (TRANSFERENCIA DE ARCHIVOS)
-            // ==========================================================
+            // NUEVO CÓDIGO TRANSFERENCIA DE ARCHIVOS
+            
             
             // Crear flujo de teclado
             teclado = new BufferedReader(new InputStreamReader(System.in));
@@ -102,9 +101,9 @@ public class ClienteEnviaTCP2 extends Thread {
         }
     }
 
-    // ==========================================================
-    // NUEVO MÉTODO: ENVÍO DE ARCHIVOS BINARIOS Y CÁLCULO DE RED
-    // ==========================================================
+
+    // NUEVO MÉTODO: ENVÍO DE ARCHIVOS  Y CÁLCULO 
+
     private void enviaArchivo(String rutaArchivo, DataOutputStream out) {
         FileInputStream fis = null;
         try {
@@ -189,9 +188,8 @@ public class ClienteEnviaTCP2 extends Thread {
         ejecutando = false;
     }
 
-    /* ==========================================================
-       CÓDIGO ORIGINAL (MENSAJES DE TEXTO) - COMENTADO
-       ==========================================================
+    /*
+
     private Mensaje enviaMensaje(BufferedReader teclado, DataOutputStream out) throws Exception {
 
         Mensaje mensajeObj = new Mensaje();
@@ -213,5 +211,5 @@ public class ClienteEnviaTCP2 extends Thread {
 
         return mensajeObj;
     }
-    ========================================================== */
+    */
 }

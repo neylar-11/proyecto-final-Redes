@@ -72,9 +72,8 @@ public class ServidorEscuchaTCP2 extends Thread {
         }
     }
 
-    // ==========================================================
-    // NUEVO MÉTODO: RECEPCIÓN DE ARCHIVOS Y ESCRITURA EN DISCO
-    // ==========================================================
+    // NUEVO  RECEPCIÓN DE ARCHIVOS Y ESCRITURA EN PC
+
     private void recibeArchivo(DataInputStream in) throws Exception {
         // 1. Leer los METADATOS (Nombre del archivo)
         String nombreArchivo = in.readUTF();
@@ -117,9 +116,8 @@ public class ServidorEscuchaTCP2 extends Thread {
         EntradaSalida.mostrarMensaje("¡Archivo '" + nombreArchivo + "' recibido y guardado con éxito!\n\n");
     }
 
-    /* ==========================================================
+    /* 
        CÓDIGO ORIGINAL (MENSAJES DE TEXTO) - COMENTADO
-       ==========================================================
     private Mensaje recibeMensaje(DataInputStream in) throws Exception {
         Mensaje mensajeObj = new Mensaje();
 
@@ -131,5 +129,5 @@ public class ServidorEscuchaTCP2 extends Thread {
 
         return mensajeObj;
     }
-    ========================================================== */
+    */
 }
