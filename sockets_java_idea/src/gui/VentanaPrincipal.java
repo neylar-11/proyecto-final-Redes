@@ -2,7 +2,9 @@ package gui;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.File;
+import java.io.*;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
 
 public class VentanaPrincipal extends JFrame {
     // Componentes de Conexión
@@ -25,15 +27,15 @@ public class VentanaPrincipal extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-        // NUEVO: Panel de Configuración de Red Superior
+        // Panel de Configuración de Red Superior
         JPanel panelNorte = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
         panelNorte.setBackground(new Color(40, 40, 40));
         
-        JLabel lblIP = new JLabel("IP del Servidor:");
+        JLabel lblIP = new JLabel("IP del Servidor (Compañero):");
         lblIP.setForeground(Color.WHITE);
         lblIP.setFont(new Font("Arial", Font.BOLD, 14));
         
-        campoIPServidor = new JTextField("192.168.1.x", 15);
+        campoIPServidor = new JTextField("192.168.1.", 15);
         campoIPServidor.setFont(new Font("Arial", Font.PLAIN, 14));
         campoIPServidor.setHorizontalAlignment(JTextField.CENTER);
 
@@ -61,7 +63,7 @@ public class VentanaPrincipal extends JFrame {
         JPanel inferior = new JPanel(new BorderLayout(5, 5));
         campoMensajeUDP = new JTextField();
         JButton btnEnviarUDP = new JButton("Enviar Mensaje");
-        lblCRC = new JLabel("Último CRC: ---");
+        lblCRC = new JLabel("Último CRC enviado: ---");
 
         inferior.add(campoMensajeUDP, BorderLayout.CENTER);
         inferior.add(btnEnviarUDP, BorderLayout.EAST);
@@ -69,12 +71,41 @@ public class VentanaPrincipal extends JFrame {
 
         panel.add(inferior, BorderLayout.SOUTH);
 
+        // ==========================================================
+        // LÓGICA DE ENVÍO UDP CON CRC32 CONECTADA AL BOTÓN
+        // ==========================================================
         btnEnviarUDP.addActionListener(e -> {
-            String ip = campoIPServidor.getText();
-            String texto = campoMensajeUDP.getText();
-            if(!texto.isEmpty()) {
-                areaChatUDP.append("A (" + ip + "): " + texto + "\n");
+            String ipTarget = campoIPServidor.getText().trim();
+            String texto = campoMensajeUDP.getText().trim();
+
+            if (texto.isEmpty() || ipTarget.isEmpty() || ipTarget.endsWith(".")) {
+                JOptionPane.showMessageDialog(this, "Por favor, escribe una IP válida y un mensaje.");
+                return;
+            }
+
+            try (DatagramSocket socketUDP = new DatagramSocket()) {
+                InetAddress destino = InetAddress.getByName(ipTarget);
+
+                // Calcular el CRC32 del texto
+                byte[] bytesOriginales = texto.getBytes(StandardCharsets.UTF_8);
+                java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+                crc.update(bytesOriginales);
+                long valorCRC = crc.getValue();
+
+                // Construir el paquete bajo nuestro protocolo: "Texto|CRC"
+                String paqueteCompleto = texto + "|" + valorCRC;
+                byte[] bufferEnvio = paqueteCompleto.getBytes(StandardCharsets.UTF_8);
+
+                DatagramPacket paquete = new DatagramPacket(bufferEnvio, bufferEnvio.length, destino, 50000);
+                socketUDP.send(paquete);
+
+                // Actualizar la interfaz gráfica
+                areaChatUDP.append("Tú -> " + texto + " [CRC: " + valorCRC + "]\n");
+                lblCRC.setText("Último CRC enviado: " + valorCRC);
                 campoMensajeUDP.setText("");
+
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error UDP al enviar: " + ex.getMessage());
             }
         });
 
@@ -103,6 +134,7 @@ public class VentanaPrincipal extends JFrame {
         panel.add(btnEnviarTCP);
         panel.add(lblMetricas);
 
+        // Selector nativo de archivos de Windows
         btnSeleccionar.addActionListener(e -> {
             JFileChooser selector = new JFileChooser();
             int resultado = selector.showOpenDialog(this);
@@ -111,16 +143,86 @@ public class VentanaPrincipal extends JFrame {
             }
         });
 
+        // ==========================================================
+        // LÓGICA DE ENVIAR ARCHIVO TCP CON METRICAS EN TIEMPO REAL
+        // ==========================================================
         btnEnviarTCP.addActionListener(e -> {
-            String ip = campoIPServidor.getText();
-            String ruta = campoRutaArchivo.getText();
-            // Lógica de validación rápida
-            if(ruta.isEmpty() || ip.isEmpty() || ip.equals("192.168.1.x")) {
-                JOptionPane.showMessageDialog(this, "Por favor verifica la IP y selecciona un archivo.");
-            } else {
-                System.out.println("Iniciando transferencia a: " + ip);
-                barraProgreso.setValue(50); // Visual de prueba
+            String ipTarget = campoIPServidor.getText().trim();
+            String ruta = campoRutaArchivo.getText().trim().replace("\"", "");
+
+            if (ruta.isEmpty() || ipTarget.isEmpty() || ipTarget.endsWith(".")) {
+                JOptionPane.showMessageDialog(this, "Verifica la IP y selecciona un archivo válido.");
+                return;
             }
+
+            File archivo = new File(ruta);
+            if (!archivo.exists()) {
+                JOptionPane.showMessageDialog(this, "El archivo seleccionado no existe en tu disco duro.");
+                return;
+            }
+
+            // Deshabilitar el botón temporalmente para evitar clics dobles
+            btnEnviarTCP.setEnabled(false);
+
+            // Creamos un Thread secundario para que la ventana no se congele durante el envío pesado
+            new Thread(() -> {
+                try (Socket socketTCP = new Socket(ipTarget, 60000);
+                     DataOutputStream out = new DataOutputStream(socketTCP.getOutputStream());
+                     FileInputStream fis = new FileInputStream(archivo)) {
+
+                    // 1. Enviar metadatos
+                    out.writeUTF(archivo.getName());
+                    out.writeLong(archivo.length());
+                    out.flush();
+
+                    byte[] buffer = new byte[8192];
+                    int bytesLeidos;
+                    long acumulados = 0;
+                    long tamanoTotal = archivo.length();
+                    long tiempoInicio = System.currentTimeMillis();
+
+                    // 2. Bucle de envío por bloques
+                    while ((bytesLeidos = fis.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytesLeidos);
+                        acumulados += bytesLeidos;
+
+                        // Cálculos matemáticos de red
+                        long tiempoActual = System.currentTimeMillis();
+                        double segundos = (tiempoActual - tiempoInicio) / 1000.0;
+                        if (segundos == 0) segundos = 0.001;
+
+                        double bps = (acumulados * 8.0) / segundos;
+                        long bytesRestantes = tamanoTotal - acumulados;
+                        double eta = (bps > 0) ? (bytesRestantes * 8.0) / bps : 0;
+                        int porcentaje = (int) (((double) acumulados / tamanoTotal) * 100);
+
+                        // Actualizar componentes gráficos de forma segura mediante el hilo de Swing
+                        final double bpsFinal = bps;
+                        final double segFinal = segundos;
+                        final double etaFinal = eta;
+                        final int porcFinal = porcentaje;
+
+                        SwingUtilities.invokeLater(() -> {
+                            barraProgreso.setValue(porcFinal);
+                            lblMetricas.setText(String.format("BPS: %.2f | Transcurrido: %.2f s | Restante: %.2f s", 
+                                    bpsFinal, segFinal, etaFinal));
+                        });
+                    }
+                    out.flush();
+
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this, "¡Archivo '" + archivo.getName() + "' enviado con éxito!");
+                        barraProgreso.setValue(100);
+                        btnEnviarTCP.setEnabled(true);
+                    });
+
+                } catch (Exception ex) {
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this, "Error de red TCP: " + ex.getMessage());
+                        btnEnviarTCP.setEnabled(true);
+                    });
+                }
+            }).start();
         });
 
         return panel;
